@@ -26,7 +26,7 @@ mainTask =
             |> Task.fromResult
             |> await
         bingoBoardStrs = List.dropFirst fileContentChunks
-        numsToDraw <-
+        _numsToDraw <-
             Str.split numsToDrawStr ","
             |> List.mapTry Str.toNat
             |> Result.mapErr \_ -> InvalidInput
@@ -81,26 +81,39 @@ parseBingoBoard = \string ->
 
 doesBoardWin : BingoBoard, Set Nat -> Bool
 doesBoardWin = \board, drawnNums ->
-    numWasDrawn = \num -> Set.contains drawnNums num
 
-    doesRowWin : BingoBoard, Nat -> Bool
-    doesRowWin = \b, rowIndex ->
-        expect rowIndex < 5
-        row = List.get b rowIndex |> Result.withDefault (crash {})
-        List.all row numWasDrawn
-
-    doesColumnWin : BingoBoard, Nat -> Bool
-    doesColumnWin = \b, colIndex ->
-        expect colIndex < 5
-        List.all b \row ->
-            num = List.get row colIndex |> Result.withDefault (crash {})
-            numWasDrawn num
+    #numWasDrawn : Nat -> Bool
+    #numWasDrawn = \num -> Set.contains drawnNums num
 
     List.range 0 4
     |> List.any \index ->
-        doesRowWin board index || doesColumnWin board index
+        doesRowWin board index drawnNums || doesColumnWin board index drawnNums
+
+doesRowWin : BingoBoard, Nat, (Set Nat) -> Bool
+doesRowWin = \b, rowIndex, drawnNums ->
+    expect rowIndex < 5
+    expect List.len b == 5
+    #row = List.get b rowIndex |> Result.withDefault (crash {})
+    row = List.get b rowIndex |> Result.withDefault []
+    expect List.len row == 5
+    #List.all row numWasDrawn
+    List.all row \num ->
+        Set.contains drawnNums num
+
+doesColumnWin : BingoBoard, Nat, (Set Nat) -> Bool
+doesColumnWin = \b, colIndex, drawnNums ->
+    expect colIndex < 5
+    expect List.len b == 5
+    List.all b \row ->
+        expect
+            List.len row == 5
+        #num = List.get row colIndex |> Result.withDefault (crash {})
+        num = List.get row colIndex |> Result.withDefault 0
+        Set.contains drawnNums num
+        #numWasDrawn num
 
 BingoBoard : List (List Nat)
+
 
 crash : {} -> *
 
@@ -121,33 +134,41 @@ expect
           [38, 35, 23, 89, 3],
       ]
 
+expect
+    (parseBingoBoard
+        """
+        1  2  3  4  5
+        6  7  8  9  10
+        11 12 13 14 15
+        16 17 18 19 20
+        21 22 23 24 25
+        """) == Ok [
+           [1, 2, 3, 4, 5],
+           [6, 7, 8, 9, 10],
+           [11, 12, 13, 14, 15],
+           [16, 17, 18, 19, 20],
+           [21, 22, 23, 24, 25],
+           ]
+
+testBoard : BingoBoard
 testBoard =
-    parseBingoBoard
-    """
-    1  2  3  4  5
-    6  7  8  9  10
-    11 12 13 14 15
-    16 17 18 19 20
-    21 22 23 24 25
-    """
+    [
+        [1, 2, 3, 4, 5],
+        [6, 7, 8, 9, 10],
+        [11, 12, 13, 14, 15],
+        [16, 17, 18, 19, 20],
+        [21, 22, 23, 24, 25],
+    ]
+
 
 expect
-    testBoard == Ok [
-       [1, 2, 3, 4, 5],
-       [6, 7, 8, 9, 10],
-       [11, 12, 13, 14, 15],
-       [16, 17, 18, 19, 20],
-       [21, 22, 23, 24, 25],
-       ]
+    (doesBoardWin testBoard (Set.fromList [1, 2, 3, 4, 5])) == Bool.true
 
 expect
-    (doesBoardWin testBoard (Set.fromList [1, 2, 3, 4, 5])) == True
+    (doesBoardWin testBoard (Set.fromList [1, 6, 11, 16, 21])) == Bool.true
 
 expect
-    (doesBoardWin testBoard (Set.fromList [1, 6, 11, 16, 21])) == True
+    (doesBoardWin testBoard (Set.fromList [1, 2, 3, 4, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 19, 20, 21, 22, 23, 25])) == Bool.false
 
 expect
-    (doesBoardWin testBoard (Set.fromList [1, 2, 3, 4, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 19, 20, 21, 22, 23, 25])) == False
-
-expect
-    (doesBoardWin testBoard (Set.fromList [1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 19, 20, 21, 22, 23, 25])) == True
+    (doesBoardWin testBoard (Set.fromList [1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 19, 20, 21, 22, 23, 25])) == Bool.true
